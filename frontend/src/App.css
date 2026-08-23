@@ -1,0 +1,326 @@
+:root {
+  --bg: #0a0a0a;
+  --bg-panel: #141414;
+  --bg-panel-alt: #1c1c1c;
+  --border: #2a2a2a;
+  --text: #f2f2f2;
+  --text-dim: #9a9a9a;
+  --orange: #ff7a1a;
+  --orange-dim: #cc5f00;
+  --green: #a8d5ba;
+  --green-dim: #7fb894;
+  --red: #e06666;
+}
+ 
+* {
+  box-sizing: border-box;
+}
+ 
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+ 
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+ 
+.app-header {
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+ 
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+ 
+.logo-badge {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  border: 2px solid var(--green);
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(168, 213, 186, 0.35);
+}
+ 
+.logo-icon {
+  width: 28px;
+  height: 28px;
+}
+ 
+.app-header h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: var(--text);
+}
+ 
+.accent-green {
+  color: var(--green);
+  text-shadow: 0 0 12px rgba(168, 213, 186, 0.3);
+}
+ 
+.accent-orange {
+  color: var(--orange);
+  text-shadow: 0 0 12px rgba(255, 122, 26, 0.25);
+}
+ 
+.app-body {
+  flex: 1;
+  display: grid;
+  /* grid-template-columns is set inline in App.js so the panels can be dragged wider/narrower */
+  min-height: 0;
+}
+ 
+.resizer {
+  cursor: col-resize;
+  background: var(--border);
+  position: relative;
+}
+ 
+.resizer:hover,
+.resizer:active {
+  background: var(--orange);
+}
+ 
+/* widen the hit area beyond the visible 6px sliver so it's easy to grab */
+.resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  right: -3px;
+}
+ 
+.panel {
+  background: var(--bg-panel);
+  padding: 20px;
+  overflow-y: auto;
+}
+ 
+.panel-inputs {
+  border-right: 1px solid var(--border);
+}
+ 
+.panel-results {
+  border-left: 1px solid var(--border);
+}
+ 
+.panel-map {
+  padding: 0;
+}
+ 
+.map {
+  height: 100%;
+  width: 100%;
+}
+ 
+.panel-section {
+  margin-bottom: 24px;
+}
+ 
+.panel-section h2 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  margin: 0 0 12px;
+}
+ 
+label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: 10px 0 4px;
+}
+ 
+input[type='text'],
+select {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 14px;
+}
+ 
+input[type='text']:focus,
+select:focus {
+  outline: none;
+  border-color: var(--orange);
+}
+ 
+.slider-row {
+  margin-bottom: 16px;
+}
+ 
+.slider-row label {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text);
+  font-size: 13px;
+}
+ 
+.slider-row label span {
+  color: var(--text-dim);
+}
+ 
+.slider {
+  width: 100%;
+  -webkit-appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  margin-top: 6px;
+}
+ 
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+ 
+.slider-orange::-webkit-slider-thumb {
+  background: var(--orange);
+}
+ 
+.slider-green::-webkit-slider-thumb {
+  background: var(--green);
+}
+ 
+.get-route-btn {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  background: var(--orange);
+  color: #0a0a0a;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  margin-top: 8px;
+}
+ 
+.get-route-btn:hover {
+  background: var(--orange-dim);
+}
+ 
+.get-route-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+ 
+.muted {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+ 
+.route-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+ 
+.route-card {
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+ 
+.route-card:hover {
+  border-color: #3a3a3a;
+}
+ 
+.route-card-active {
+  border-color: var(--orange);
+  background: rgba(255, 122, 26, 0.08);
+}
+ 
+.route-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+ 
+.route-card-name {
+  font-weight: 600;
+  font-size: 15px;
+}
+ 
+.route-card-score {
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--orange);
+}
+ 
+.route-card-map {
+  height: 150px;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  /* the mini map is decorative only — clicks pass through to select the card */
+  pointer-events: none;
+}
+ 
+.mini-map {
+  height: 100%;
+  width: 100%;
+  background: var(--bg-panel);
+}
+ 
+.route-card-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 18px;
+}
+ 
+.route-card-metrics .metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+ 
+.route-card-metrics .metric-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+}
+ 
+.route-card-metrics .metric-value {
+  font-size: 14px;
+}
+ 
+.metric-green {
+  color: var(--green);
+}
+ 
+.metric-good {
+  color: var(--green);
+}
+ 
+.metric-bad {
+  color: var(--red);
+}
