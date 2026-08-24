@@ -12,7 +12,9 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
  
-const CAR_MAKES = [
+// Used only if the live fueleconomy.gov API call fails (network hiccup, CORS
+// block, their server down, etc.) — so the Vehicle section never goes blank.
+const FALLBACK_MAKES = [
   'Toyota', 'Honda', 'Ford', 'Chevrolet', 'Nissan',
   'BMW', 'Mercedes-Benz', 'Hyundai', 'Kia', 'Tesla', 'Subaru',
 ];
@@ -26,6 +28,42 @@ const GAS_TYPES = [
  
 // TODO: change this to your target city's coordinates
 const CITY_CENTER = [37.7749, -122.4194];
+ 
+const FUELECONOMY_MENU_BASE = 'https://www.fueleconomy.gov/ws/rest/vehicle/menu';
+ 
+// fueleconomy.gov's "menu" endpoints return XML like:
+// <menuItems><menuItem><value>2024</value><text>2024</text></menuItem>...</menuItems>
+async function fetchMenuXML(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`fueleconomy.gov responded ${res.status}`);
+  const text = await res.text();
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  if (doc.querySelector('parsererror')) throw new Error('bad XML from fueleconomy.gov');
+  return Array.from(doc.getElementsByTagName('menuItem')).map((item) => ({
+    value: item.getElementsByTagName('value')[0]?.textContent ?? '',
+    text: item.getElementsByTagName('text')[0]?.textContent ?? '',
+  }));
+}
+ 
+// Free geocoder (OpenStreetMap's Nominatim) — turns "123 Main St" into [lat, lng].
+// Their usage policy caps this at ~1 request/sec and asks that you not hammer it
+// in a loop — fine for a user clicking "Get Routes" occasionally, not for bulk use.
+async function geocode(text) {
+  if (!text || !text.trim()) return null;
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(
+      text
+    )}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.length) return null;
+    return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+  } catch (err) {
+    console.warn('Geocoding failed for', text, err);
+    return null;
+  }
+}
  
 // ---- Mock data generator ----
 // Stand-in for your friend's backend so you can build/test the UI right now.
@@ -196,8 +234,78 @@ function RouteCard({ route, active, onSelect }) {
 function App() {
   const [startText, setStartText] = useState('');
   const [endText, setEndText] = useState('');
-  const [carMake, setCarMake] = useState(CAR_MAKES[0]);
   const [gasType, setGasType] = useState(GAS_TYPES[0].value);
+ 
+  // Vehicle Year/Make/Model, populated live from fueleconomy.gov's real API.
+  // vehicleDataStatus tracks whether that succeeded ('live') or we had to
+  // drop back to the small hardcoded FALLBACK_MAKES list ('fallback').
+  const [vehicleDataStatus, setVehicleDataStatus] = useState('loading');
+  const [years, setYears] = useState([]);
+  const [makes, setMakes] = useState([]);
+  const [models, setModels] = useState([]);
+  const [selectedYear, setSelectedYear] = useState('');
+  const [selectedMake, setSelectedMake] = useState('');
+  const [selectedModel, setSelectedModel] = useState('');
+ 
+  // Load the year list on mount
+  useEffect(() => {
+    async function loadYears() {
+      try {
+        const items = await fetchMenuXML(`${FUELECONOMY_MENU_BASE}/year`);
+        if (!items.length) throw new Error('empty year list');
+        setYears(items);
+        setSelectedYear(items[0].value);
+        setVehicleDataStatus('live');
+      } catch (err) {
+        console.warn('fueleconomy.gov unavailable, falling back to static make list:', err);
+        setVehicleDataStatus('fallback');
+        setMakes(FALLBACK_MAKES.map((m) => ({ value: m, text: m })));
+        setSelectedMake(FALLBACK_MAKES[0]);
+      }
+    }
+    loadYears();
+  }, []);
+ 
+  // When the year changes (live mode only), load makes for that year
+  useEffect(() => {
+    if (vehicleDataStatus !== 'live' || !selectedYear) return;
+    async function loadMakes() {
+      try {
+        const items = await fetchMenuXML(`${FUELECONOMY_MENU_BASE}/make?year=${selectedYear}`);
+        setMakes(items);
+        setSelectedMake(items[0]?.value ?? '');
+        setModels([]);
+        setSelectedModel('');
+      } catch (err) {
+        console.warn('fueleconomy.gov make list failed, falling back:', err);
+        setVehicleDataStatus('fallback');
+        setMakes(FALLBACK_MAKES.map((m) => ({ value: m, text: m })));
+        setSelectedMake(FALLBACK_MAKES[0]);
+      }
+    }
+    loadMakes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedYear]);
+ 
+  // When the make changes (live mode only), load models for that year+make
+  useEffect(() => {
+    if (vehicleDataStatus !== 'live' || !selectedYear || !selectedMake) return;
+    async function loadModels() {
+      try {
+        const items = await fetchMenuXML(
+          `${FUELECONOMY_MENU_BASE}/model?year=${selectedYear}&make=${encodeURIComponent(selectedMake)}`
+        );
+        setModels(items);
+        setSelectedModel(items[0]?.value ?? '');
+      } catch (err) {
+        console.warn('fueleconomy.gov model list failed:', err);
+        setModels([]);
+        setSelectedModel('');
+      }
+    }
+    loadModels();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMake]);
  
   const [weights, setWeights] = useState({ speed: 34, eco: 33, safety: 33 });
  
@@ -267,27 +375,42 @@ function App() {
   // waiting on setWeights() to finish updating state before firing the request.
   async function handleGetRoutes(customWeights) {
     const useWeights = customWeights || weights;
- 
-    // --- Replace this whole block once the backend endpoint is ready ---
-    // const response = await fetch('http://localhost:5000/route', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ start, end, weights: useWeights, carMake, gasType }),
-    // });
-    // const data = await response.json();
-    // setRoutes(data.routes);
-    // ---------------------------------------------------------------
- 
     setLoading(true);
-    const start = CITY_CENTER;
-    const end = [CITY_CENTER[0] + 0.02, CITY_CENTER[1] + 0.02];
  
-    setTimeout(() => {
+    // Real geocoding: turn the typed addresses into [lat, lng]. Falls back to
+    // the demo city-center points if the box is empty or geocoding fails.
+    const geocodedStart = await geocode(startText);
+    const geocodedEnd = await geocode(endText);
+    const start = geocodedStart || CITY_CENTER;
+    const end = geocodedEnd || [CITY_CENTER[0] + 0.02, CITY_CENTER[1] + 0.02];
+ 
+    try {
+      const response = await fetch('http://localhost:5000/route', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          start,
+          end,
+          weights: useWeights,
+          vehicle: { year: selectedYear, make: selectedMake, model: selectedModel },
+          gasType,
+        }),
+      });
+      if (!response.ok) throw new Error(`backend responded ${response.status}`);
+      const data = await response.json();
+      setRoutes(data.routes);
+      setSelectedRouteId(data.routes[0]?.id ?? null);
+    } catch (err) {
+      // Backend not reachable yet (not started locally, still being built,
+      // wrong port, etc.) — fall back to mock routes so the UI keeps working
+      // instead of going blank. Remove this catch once the backend is solid.
+      console.warn('Backend not reachable, showing mock routes instead:', err);
       const generated = generateMockRoutes(start, end, useWeights);
       setRoutes(generated);
-      setSelectedRouteId(generated[0].id);
+      setSelectedRouteId(generated[0]?.id ?? null);
+    } finally {
       setLoading(false);
-    }, 400);
+    }
   }
  
   const PRESETS = {
@@ -360,14 +483,53 @@ function App() {
  
           <section className="panel-section">
             <h2>Vehicle</h2>
-            <label>Car make</label>
-            <select value={carMake} onChange={(e) => setCarMake(e.target.value)}>
-              {CAR_MAKES.map((make) => (
-                <option key={make} value={make}>
-                  {make}
+ 
+            {vehicleDataStatus === 'live' && (
+              <>
+                <label>Year</label>
+                <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)}>
+                  {years.map((y) => (
+                    <option key={y.value} value={y.value}>
+                      {y.text}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+ 
+            <label>Make</label>
+            <select value={selectedMake} onChange={(e) => setSelectedMake(e.target.value)}>
+              {makes.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.text}
                 </option>
               ))}
             </select>
+ 
+            {vehicleDataStatus === 'live' && (
+              <>
+                <label>Model</label>
+                <select
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  disabled={models.length === 0}
+                >
+                  {models.length === 0 && <option value="">Loading models...</option>}
+                  {models.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.text}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+ 
+            {vehicleDataStatus === 'fallback' && (
+              <p className="muted vehicle-fallback-note">
+                Live vehicle data unavailable right now — showing a basic make list instead.
+              </p>
+            )}
+ 
             <label>Gas type</label>
             <select value={gasType} onChange={(e) => setGasType(e.target.value)}>
               {GAS_TYPES.map((g) => (
