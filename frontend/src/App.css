@@ -30,7 +30,7 @@ body {
 }
  
 .app-header {
-  padding: 14px 24px;
+  padding: 28px 32px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-panel);
 }
@@ -38,38 +38,51 @@ body {
 .logo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 20px;
 }
  
 .logo-badge {
-  width: 40px;
-  height: 40px;
+  width: 92px;
+  height: 92px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   background: #000;
   border: 2px solid var(--green);
-  border-radius: 10px;
-  box-shadow: 0 0 10px rgba(168, 213, 186, 0.35);
+  border-radius: 18px;
+  box-shadow: 0 0 20px rgba(168, 213, 186, 0.4);
 }
  
 .logo-icon {
-  width: 28px;
-  height: 28px;
+  width: 70px;
+  height: 70px;
+}
+ 
+.logo-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
  
 .app-header h1 {
   margin: 0;
-  font-size: 22px;
+  font-size: 40px;
   font-weight: 800;
-  letter-spacing: 1.5px;
+  letter-spacing: 2px;
   color: var(--text);
+}
+ 
+.logo-subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-dim);
+  letter-spacing: 0.3px;
 }
  
 .accent-green {
   color: var(--green);
-  text-shadow: 0 0 12px rgba(168, 213, 186, 0.3);
+  text-shadow: 0 0 14px rgba(168, 213, 186, 0.35);
 }
  
 .accent-orange {
@@ -202,6 +215,48 @@ select:focus {
  
 .slider-green::-webkit-slider-thumb {
   background: var(--green);
+}
+ 
+.preset-row {
+  display: flex;
+  gap: 8px;
+}
+ 
+.preset-btn {
+  flex: 1;
+  padding: 10px 4px;
+  border-radius: 6px;
+  background: var(--bg-panel-alt);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+ 
+.preset-btn-orange {
+  border: 1px solid var(--orange);
+  color: var(--orange);
+}
+ 
+.preset-btn-orange:hover {
+  background: var(--orange);
+  color: #0a0a0a;
+}
+ 
+.preset-btn-green {
+  border: 1px solid var(--green);
+  color: var(--green);
+}
+ 
+.preset-btn-green:hover {
+  background: var(--green);
+  color: #0a0a0a;
+}
+ 
+.preset-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
  
 .get-route-btn {

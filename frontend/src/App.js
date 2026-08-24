@@ -263,12 +263,16 @@ function App() {
     setWeights(updated);
   }
  
-  async function handleGetRoutes() {
+  // customWeights lets preset buttons pass their weights directly, instead of
+  // waiting on setWeights() to finish updating state before firing the request.
+  async function handleGetRoutes(customWeights) {
+    const useWeights = customWeights || weights;
+ 
     // --- Replace this whole block once the backend endpoint is ready ---
     // const response = await fetch('http://localhost:5000/route', {
     //   method: 'POST',
     //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ start, end, weights, carMake, gasType }),
+    //   body: JSON.stringify({ start, end, weights: useWeights, carMake, gasType }),
     // });
     // const data = await response.json();
     // setRoutes(data.routes);
@@ -279,11 +283,23 @@ function App() {
     const end = [CITY_CENTER[0] + 0.02, CITY_CENTER[1] + 0.02];
  
     setTimeout(() => {
-      const generated = generateMockRoutes(start, end, weights);
+      const generated = generateMockRoutes(start, end, useWeights);
       setRoutes(generated);
       setSelectedRouteId(generated[0].id);
       setLoading(false);
     }, 400);
+  }
+ 
+  const PRESETS = {
+    fastest: { speed: 100, eco: 0, safety: 0 },
+    eco: { speed: 0, eco: 100, safety: 0 },
+    safest: { speed: 0, eco: 0, safety: 100 },
+  };
+ 
+  function handlePreset(name) {
+    const presetWeights = PRESETS[name];
+    setWeights(presetWeights);
+    handleGetRoutes(presetWeights);
   }
  
   return (
@@ -292,27 +308,30 @@ function App() {
         <div className="logo">
           <div className="logo-badge">
             <svg viewBox="0 0 48 48" className="logo-icon">
-              {/* leaf outline */}
+              {/* large leaf outline */}
               <path
-                d="M24 4 C11 9 6 22 12 32 C16 39 24 44 24 44 C24 44 32 39 36 32 C42 22 37 9 24 4 Z"
+                d="M24 2 C8 8 2 24 10 35 C15 42 24 46 24 46 C24 46 33 42 38 35 C46 24 40 8 24 2 Z"
                 fill="#a8d5ba"
-                stroke="#7fb894"
+                stroke="#ffffff"
                 strokeWidth="1.5"
               />
-              {/* central vein + branching route-veins */}
+              {/* central vein + branching route-veins, in white */}
               <path
-                d="M24 40 L24 8 M24 32 L15 24 M24 32 L33 24 M24 20 L17 14 M24 20 L31 14"
+                d="M24 42 L24 6 M24 33 L13 23 M24 33 L35 23 M24 20 L15 12 M24 20 L33 12"
                 fill="none"
-                stroke="#ff7a1a"
-                strokeWidth="1.6"
+                stroke="#ffffff"
+                strokeWidth="1.8"
                 strokeLinecap="round"
               />
             </svg>
           </div>
-          <h1>
-            <span className="accent-green">GREEN</span>
-            <span className="accent-orange">ROUTE</span>
-          </h1>
+          <div className="logo-text">
+            <h1>
+              <span className="accent-green">GREEN</span>
+              <span className="accent-orange">ROUTE</span>
+            </h1>
+            <p className="logo-subtitle">Speed. Eco. Safety. Your route, your priorities.</p>
+          </div>
         </div>
       </header>
  
@@ -357,6 +376,33 @@ function App() {
                 </option>
               ))}
             </select>
+          </section>
+ 
+          <section className="panel-section">
+            <h2>Presets</h2>
+            <div className="preset-row">
+              <button
+                className="preset-btn preset-btn-orange"
+                onClick={() => handlePreset('fastest')}
+                disabled={loading}
+              >
+                Fastest
+              </button>
+              <button
+                className="preset-btn preset-btn-green"
+                onClick={() => handlePreset('eco')}
+                disabled={loading}
+              >
+                Eco
+              </button>
+              <button
+                className="preset-btn preset-btn-orange"
+                onClick={() => handlePreset('safest')}
+                disabled={loading}
+              >
+                Safest
+              </button>
+            </div>
           </section>
  
           <section className="panel-section">
