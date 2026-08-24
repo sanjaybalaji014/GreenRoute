@@ -45,6 +45,19 @@ async function fetchMenuXML(url) {
   }));
 }
  
+// Wraps fetch() with a hard timeout so a hung/slow request (dead server,
+// blocked network, no response at all) can't leave the app stuck waiting
+// forever — it aborts and lets the caller fall back instead.
+async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(id);
+  }
+}
+ 
 // Free geocoder (OpenStreetMap's Nominatim) — turns "123 Main St" into [lat, lng].
 // Their usage policy caps this at ~1 request/sec and asks that you not hammer it
 // in a loop — fine for a user clicking "Get Routes" occasionally, not for bulk use.
@@ -54,7 +67,7 @@ async function geocode(text) {
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(
       text
     )}`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url, {}, 5000);
     if (!res.ok) return null;
     const data = await res.json();
     if (!data.length) return null;
@@ -377,37 +390,49 @@ function App() {
     const useWeights = customWeights || weights;
     setLoading(true);
  
-    // Real geocoding: turn the typed addresses into [lat, lng]. Falls back to
-    // the demo city-center points if the box is empty or geocoding fails.
-    const geocodedStart = await geocode(startText);
-    const geocodedEnd = await geocode(endText);
-    const start = geocodedStart || CITY_CENTER;
-    const end = geocodedEnd || [CITY_CENTER[0] + 0.02, CITY_CENTER[1] + 0.02];
- 
+    // Everything lives inside this try/finally so setLoading(false) ALWAYS
+    // runs, even if geocoding or the backend call hangs, times out, or throws
+    // something unexpected. This is what was leaving the UI stuck before —
+    // a hung network call meant "loading" never got cleared.
     try {
-      const response = await fetch('http://localhost:5000/route', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          start,
-          end,
-          weights: useWeights,
-          vehicle: { year: selectedYear, make: selectedMake, model: selectedModel },
-          gasType,
-        }),
-      });
-      if (!response.ok) throw new Error(`backend responded ${response.status}`);
-      const data = await response.json();
-      setRoutes(data.routes);
-      setSelectedRouteId(data.routes[0]?.id ?? null);
-    } catch (err) {
-      // Backend not reachable yet (not started locally, still being built,
-      // wrong port, etc.) — fall back to mock routes so the UI keeps working
-      // instead of going blank. Remove this catch once the backend is solid.
-      console.warn('Backend not reachable, showing mock routes instead:', err);
-      const generated = generateMockRoutes(start, end, useWeights);
-      setRoutes(generated);
-      setSelectedRouteId(generated[0]?.id ?? null);
+      // Real geocoding: turn the typed addresses into [lat, lng]. Falls back
+      // to the demo city-center points if the box is empty, or geocoding
+      // fails, or times out after 5s.
+      const geocodedStart = await geocode(startText);
+      const geocodedEnd = await geocode(endText);
+      const start = geocodedStart || CITY_CENTER;
+      const end = geocodedEnd || [CITY_CENTER[0] + 0.02, CITY_CENTER[1] + 0.02];
+ 
+      try {
+        const response = await fetchWithTimeout(
+          'http://localhost:5000/route',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              start,
+              end,
+              weights: useWeights,
+              vehicle: { year: selectedYear, make: selectedMake, model: selectedModel },
+              gasType,
+            }),
+          },
+          4000
+        );
+        if (!response.ok) throw new Error(`backend responded ${response.status}`);
+        const data = await response.json();
+        setRoutes(data.routes);
+        setSelectedRouteId(data.routes[0]?.id ?? null);
+      } catch (err) {
+        // Backend not reachable yet (not started locally, still being built,
+        // wrong port, timed out, etc.) — fall back to mock routes so the UI
+        // keeps working instead of getting stuck. Remove this catch once the
+        // backend is solid.
+        console.warn('Backend not reachable, showing mock routes instead:', err);
+        const generated = generateMockRoutes(start, end, useWeights);
+        setRoutes(generated);
+        setSelectedRouteId(generated[0]?.id ?? null);
+      }
     } finally {
       setLoading(false);
     }
@@ -419,10 +444,10 @@ function App() {
     safest: { speed: 0, eco: 0, safety: 100 },
   };
  
+  // Just snaps the sliders to the preset — doesn't fetch routes on its own.
+  // The user still hits "Get Routes" whenever they're ready.
   function handlePreset(name) {
-    const presetWeights = PRESETS[name];
-    setWeights(presetWeights);
-    handleGetRoutes(presetWeights);
+    setWeights(PRESETS[name]);
   }
  
   return (
