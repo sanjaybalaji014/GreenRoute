@@ -286,6 +286,11 @@ select:focus {
   font-size: 13px;
 }
  
+.vehicle-fallback-note {
+  margin-top: 8px;
+  line-height: 1.4;
+}
+ 
 .route-cards {
   display: flex;
   flex-direction: column;

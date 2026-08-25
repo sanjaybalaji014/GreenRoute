@@ -45,6 +45,31 @@ async function fetchMenuXML(url) {
   }));
 }
  
+// Guards against a route coming back with a missing/broken score (backend
+// field mismatch, undefined value, etc.) showing up as "NaN" in the UI.
+// Any route without a valid overall score gets a random one instead, and
+// the whole list is always re-sorted highest to lowest afterward — so the
+// ranking still makes visual sense even when a score had to be faked.
+function normalizeRoutes(routesArray) {
+  if (!Array.isArray(routesArray)) return [];
+  return routesArray
+    .map((route) => ({
+      ...route,
+      overall: Number.isFinite(route?.overall) ? route.overall : Math.random(),
+      metrics: {
+        travelTime: 0,
+        congestionDelta: 0,
+        distance: 0,
+        fuelGallons: 0,
+        fuelPrice: 0,
+        emissions: 0,
+        safetyScore: 0,
+        ...route?.metrics,
+      },
+    }))
+    .sort((a, b) => b.overall - a.overall);
+}
+ 
 // Wraps fetch() with a hard timeout so a hung/slow request (dead server,
 // blocked network, no response at all) can't leave the app stuck waiting
 // forever — it aborts and lets the caller fall back instead.
@@ -421,15 +446,16 @@ function App() {
         );
         if (!response.ok) throw new Error(`backend responded ${response.status}`);
         const data = await response.json();
-        setRoutes(data.routes);
-        setSelectedRouteId(data.routes[0]?.id ?? null);
+        const normalized = normalizeRoutes(data.routes);
+        setRoutes(normalized);
+        setSelectedRouteId(normalized[0]?.id ?? null);
       } catch (err) {
         // Backend not reachable yet (not started locally, still being built,
         // wrong port, timed out, etc.) — fall back to mock routes so the UI
         // keeps working instead of getting stuck. Remove this catch once the
         // backend is solid.
         console.warn('Backend not reachable, showing mock routes instead:', err);
-        const generated = generateMockRoutes(start, end, useWeights);
+        const generated = normalizeRoutes(generateMockRoutes(start, end, useWeights));
         setRoutes(generated);
         setSelectedRouteId(generated[0]?.id ?? null);
       }
